@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>Astronaut, Run! - Cyber Runner</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #050510; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; }
+        #gameContainer { position: relative; width: 450px; height: 600px; border: 4px solid #333; border-radius: 15px; box-shadow: 0 0 50px rgba(0,242,255,0.4); overflow: hidden; background: #000; }
+        canvas { display: block; }
+        
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; z-index: 100; box-sizing: border-box; }
+        .bg-dark { background: rgba(5, 5, 20, 0.95); }
+        .btn-neon { padding: 12px 40px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; color: #050510; box-shadow: 0 0 20px #00f2ff; margin-top: 20px; transition: 0.2s; }
+        .btn-neon:hover { transform: scale(1.05); background: #fff; }
+        
+        .manual { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 10px; font-size: 13px; text-align: left; line-height: 1.5; border: 1px solid #444; width: 85%; margin-top: 15px; }
+        .key-hint { font-size: 12px; color: #00f2ff; margin-top: 10px; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        .item-grid { display: flex; gap: 8px; margin-top: 15px; justify-content: center; flex-wrap: wrap; }
+        .item-card { border: 2px solid #444; padding: 10px; border-radius: 10px; width: 95px; cursor: pointer; background: rgba(255,255,255,0.05); font-size: 11px; transition: 0.3s; }
+        .item-card:hover { background: rgba(255,255,255,0.1); }
+        .item-card.selected { border-color: #00f2ff; background: rgba(0,242,255,0.2); box-shadow: 0 0 10px #00f2ff; }
+
+        #pauseOverlay { display: none; background: rgba(0,0,0,0.85); z-index: 200; flex-direction: row; }
+        #sideShop { width: 180px; height: 100%; background: #0a0a1a; border-left: 2px solid #00f2ff; padding: 20px 10px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+        .shop-btn { background: #222; border: 1px solid #444; color: white; width: 100%; padding: 12px 5px; margin-bottom: 12px; cursor: pointer; font-size: 11px; border-radius: 5px; transition: 0.2s; }
+        .shop-btn:hover { border-color: #ffcc00; color: #ffcc00; transform: translateX(-5px); }
+
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; color: #00f2ff; z-index: 50; text-align: left; }
+        .score-row { font-size: 32px; font-weight: bold; text-shadow: 0 0 10px #00f2ff; }
+        #hud { position: absolute; bottom: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 13px; border-left: 4px solid #00f2ff; z-index: 50; }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="startScreen" class="overlay bg-dark">
+        <h1 style="color:#00f2ff; text-shadow:0 0 20px #00f2ff; font-size: 48px; margin: 0;">Astronaut, Run!</h1>
+        <div class="manual">
+            <b style="color:#ffcc00">宇宙生存指南：</b><br>
+            • <b>W / S</b> : 跳躍 / 下滑 (空中按S可快速落地)<br>
+            • <b>A / D</b> : 左右切換跑道<br>
+            • <b>Z</b> : 暫停遊戲 & 宇宙商店 🛒<br>
+            • <b>Q</b> : 使用裝備 (每場限用 3 次)<br>
+            • <b>Space</b> : 進入整備 / 啟動引擎 / 重新開始
+        </div>
+        <button class="btn-neon" onclick="toLobby()">進入整備室</button>
+        <div class="key-hint">按下 [空白鍵]</div>
+    </div>
+
+    <div id="lobbyScreen" class="overlay bg-dark" style="display:none;">
+        <h2 style="color:#00f2ff">整備室：選擇出戰裝備</h2>
+        <div style="color:#ffcc00; margin-bottom:10px; font-size:18px;">持有的金幣: $<span id="lobbyCoins">0</span></div>
+        <div class="item-grid">
+            <div class="item-card" id="card-shield" onclick="selectItem('shield')">🛡️<br>防護罩(5s)<br>(持有:<span id="inv-shield">0</span>)</div>
+            <div class="item-card" id="card-double" onclick="selectItem('double')">💎<br>炭吉素素(30s)<br>(持有:<span id="inv-double">0</span>)</div>
+            <div class="item-card" id="card-super" onclick="selectItem('super')">🔥<br>超級防護(20s)<br>(持有:<span id="inv-super">0</span>)</div>
+            <div class="item-card" id="card-none" style="width:100%; margin-top:5px;" onclick="selectItem('none')">🚫 裸奔出發 (不使用道具)</div>
+        </div>
+        <button class="btn-neon" onclick="startGame()">出發！</button>
+        <div class="key-hint">按下 [空白鍵] 出發</div>
+    </div>
+
+    <div id="pauseOverlay" class="overlay">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+            <h2 style="color:#00f2ff; font-size: 42px; margin:0;">PAUSED</h2>
+            <p style="letter-spacing: 2px;">按 Z 鍵回到宇宙</p>
+        </div>
+        <div id="sideShop">
+            <div style="font-size: 20px; border-bottom:1px solid #333; width:100%; padding-bottom:10px;">宇宙商店</div>
+            <div style="color:#ffcc00; margin: 15px 0; font-size: 18px;">💰 $<span id="shopCoins">0</span></div>
+            <button class="shop-btn" onclick="buy('shield')">🛡️ 防護罩 $50</button>
+            <button class="shop-btn" onclick="buy('double')">💎 炭吉素素 $100</button>
+            <button class="shop-btn" onclick="buy('super')">🔥 超級防護 $150</button>
+            <div style="font-size:10px; color:#666; margin-top: auto;">提示：分數增加10分可換5金幣</div>
+        </div>
+    </div>
+
+    <div id="ui">
+        <div style="color:#ff5555; font-size:14px; font-weight:bold;">HI-SCORE: <span id="hiText">0</span></div>
+        <div class="score-row">SCORE: <span id="scoreText">0</span></div>
+        <div style="color:#ffcc00; font-weight:bold; font-size:18px;">GOLD: $<span id="coinText">0</span></div>
+    </div>
+
+    <div id="hud">
+        <div id="hud-item">裝備：無</div>
+        <div id="hud-count">剩餘次數：0/3</div>
+        <div id="hud-timer" style="color:#00f2ff; font-weight:bold; margin-top:5px; height: 15px;"></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 450; canvas.height = 600;
+
+    // 數據管理
+    let gold = parseInt(localStorage.getItem('astro_gold')) || 0;
+    let high = parseInt(localStorage.getItem('astro_high')) || 0;
+    let inv = JSON.parse(localStorage.getItem('astro_inv')) || { shield: 0, double: 0, super: 0 };
+
+    let score, speed, isPaused, obstacles, frame, playerColor;
+    let currentItem = 'none', useCount = 0, buff = { type: '', timer: 0 };
+    let gameState = 'START'; 
+
+    const player = { 
+        x: 225, 
+        lane: 1, 
+        jumping: false, 
+        v: 0, 
+        y: 0, 
+        sliding: 0, 
+        gravity: 1.2, // 調快重力感
+        baseSlideTime: 18 // 縮短下滑時間
+    };
+
+    function save() {
+        localStorage.setItem('astro_gold', gold);
+        localStorage.setItem('astro_high', high);
+        localStorage.setItem('astro_inv', JSON.stringify(inv));
+    }
+
+    function syncUI() {
+        document.getElementById('lobbyCoins').innerText = gold;
+        document.getElementById('shopCoins').innerText = gold;
+        document.getElementById('coinText').innerText = gold;
+        document.getElementById('hiText').innerText = high;
+        document.getElementById('inv-shield').innerText = inv.shield;
+        document.getElementById('inv-double').innerText = inv.double;
+        document.getElementById('inv-super').innerText = inv.super;
+        document.querySelectorAll('.item-card').forEach(c => c.classList.toggle('selected', c.id === 'card-'+currentItem));
+    }
+
+    function toLobby() {
+        gameState = 'LOBBY';
+        document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('lobbyScreen').style.display = 'flex';
+        syncUI();
+    }
+
+    function selectItem(t) { currentItem = t; syncUI(); }
+
+    function buy(t) {
+        const p = { shield: 50, double: 100, super: 150 };
+        if (gold >= p[t]) { gold -= p[t]; inv[t]++; save(); syncUI(); }
+    }
+
+    function startGame() {
+        gameState = 'PLAYING';
+        document.getElementById('lobbyScreen').style.display = 'none';
+        score = 0; speed = 0.016; isPaused = false; obstacles = []; player.lane = 1; frame = 0; useCount = 0; buff = { type: '', timer: 0 };
+        playerColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        const names = { shield:'🛡️ 防護罩', double:'💎 炭吉素素', super:'🔥 超級防護', none:'無' };
+        document.getElementById('hud-item').innerText = "裝備：" + names[currentItem];
+        updateHUD(); syncUI();
+        requestAnimationFrame(loop);
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-count').innerText = `剩餘使用次數：${3 - useCount}/3`;
+        document.getElementById('hud-timer').innerText = buff.timer > 0 ? "⚠️ 道具生效中" : "";
+    }
+
+    window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        if (e.code === 'Space') {
+            if (gameState === 'START') toLobby();
+            else if (gameState === 'LOBBY') startGame();
+            else if (gameState === 'OVER') toLobby();
+            return;
+        }
+        if (k === 'z' && gameState === 'PLAYING') {
+            isPaused = !isPaused;
+            document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
+            if (!isPaused) loop();
+            return;
+        }
+        if (k === 'q' && gameState === 'PLAYING' && !isPaused && currentItem !== 'none' && useCount < 3 && inv[currentItem] > 0) {
+            inv[currentItem]--; useCount++; buff.type = currentItem;
+            // 換算秒數 (約 60fps)
+            buff.timer = currentItem === 'shield' ? 300 : (currentItem === 'double' ? 1800 : 1200);
+            save(); syncUI(); updateHUD();
+            return;
+        }
+
+        if (gameState !== 'PLAYING' || isPaused) return;
+        if (k === 'a' && player.lane > 0) player.lane--;
+        if (k === 'd' && player.lane < 2) player.lane++;
+        if (k === 'w') {
+            if (player.sliding > 0) player.sliding = 0; // 下滑中起跳
+            if (!player.jumping) { player.v = 18; player.jumping = true; }
+        }
+        if (k === 's') {
+            if (player.jumping) { player.v = -20; } // 空中俯衝落地
+            else { player.sliding = player.baseSlideTime; } 
+        }
+    });
+
+    function drawScene() {
+        let g = ctx.createLinearGradient(0, 0, 0, 600);
+        g.addColorStop(0, '#050510'); g.addColorStop(0.4, '#151530'); g.addColorStop(1, '#000');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 450, 600);
+
+        // 繪製跑道格線 (動態流動感)
+        ctx.strokeStyle = '#00f2ff33'; ctx.lineWidth = 2;
+        let horizonY = 240;
+        let offset = (frame * speed * 20) % 100;
+        
+        // 橫線
+        for(let i=0; i<10; i++){
+            let y = horizonY + Math.pow(i/10, 2) * 360 + offset;
+            if(y > 600) continue;
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(450, y); ctx.stroke();
+        }
+        // 直線
+        [-300, -100, 100, 300].forEach(w => {
+            ctx.beginPath(); ctx.moveTo(225 + w/15, horizonY); ctx.lineTo(225 + w, 600); ctx.stroke();
+        });
+    }
+
+    function drawPlayer(f) {
+        let targetX = [100, 225, 350][player.lane];
+        player.x += (targetX - player.x) * 0.3;
+        
+        ctx.save(); ctx.translate(player.x, 540 - player.y);
+        
+        // 特效
+        if (buff.timer > 0 && (buff.type === 'shield' || buff.type === 'super')) {
+            ctx.strokeStyle = buff.type === 'super' ? '#ffcc00' : '#00f2ff';
+            ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.arc(0, -35, 45 + Math.sin(f*0.2)*5, 0, 7); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        ctx.fillStyle = playerColor;
+        if (player.sliding > 0) {
+            // 下滑縮成球狀
+            ctx.beginPath(); ctx.ellipse(0, -15, 35, 15, 0, 0, 7); ctx.fill(); 
+            ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(15, -18, 5, 0, 7); ctx.fill();
+        } else {
+            // 精細外星人
+            ctx.beginPath(); ctx.ellipse(0, -55, 20, 25, 0, 0, 7); ctx.fill(); // 頭
+            ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(-8,-60,5,10,0,0,7); ctx.ellipse(8,-60,5,10,0,0,7); ctx.fill(); // 雙眼
+            ctx.fillStyle=playerColor; ctx.roundRect(-18,-35,36,30, 5); ctx.fill(); // 身體
+            let legMove = Math.sin(f * 0.4) * 15;
+            ctx.lineWidth=10; ctx.strokeStyle=playerColor; ctx.lineCap='round';
+            ctx.beginPath(); ctx.moveTo(-10,-10); ctx.lineTo(-10, 5 + legMove); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(10,-10); ctx.lineTo(10, 5 - legMove); ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function drawObs(o, f) {
+        let z = o.z;
+        let horizonY = 240;
+        let screenY = horizonY + (z * 360);
+        let scale = 0.05 + z * 1.6;
+        let laneX = [85, 225, 365][o.lane];
+        let screenX = 225 + (laneX - 225) * scale;
+
+        ctx.save(); ctx.translate(screenX, screenY); ctx.scale(scale, scale);
+        
+        if (o.type === 'GOBLIN') {
+            // 綠色哥布林：矮
+            ctx.fillStyle = '#4e9a06'; 
+            ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(0,-40); ctx.lineTo(20,0); ctx.fill(); // 尖頭
+            ctx.fillStyle = '#fff'; ctx.fillRect(-8,-25,5,5); ctx.fillRect(3,-25,5,5); // 眼
+            ctx.fillStyle = '#ff0000'; ctx.fillRect(-5,-15,10,2); // 嘴
+            ctx.strokeStyle = '#4e9a06'; ctx.lineWidth=4;
+            let arm = Math.sin(f*0.2)*10;
+            ctx.beginPath(); ctx.moveTo(-15,-20); ctx.lineTo(-25+arm, -10); ctx.stroke(); // 手
+            ctx.beginPath(); ctx.moveTo(15,-20); ctx.lineTo(25-arm, -10); ctx.stroke();
+        } else if (o.type === 'ASTRONAUT') {
+            // 漂浮太空人：高
+            ctx.translate(0, -60);
+            let hover = Math.sin(f*0.1)*10;
+            ctx.translate(0, hover);
+            ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.arc(0,-40,22,0,7); ctx.fill(); // 頭盔
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(0,-40,16,10,0,0,7); ctx.fill(); // 面罩
+            ctx.fillStyle = '#ddd'; ctx.roundRect(-20,-20,40,40,5); ctx.fill(); // 身體
+            ctx.fillStyle = '#00f2ff'; ctx.beginPath(); ctx.ellipse(0, 30, 25, 6, 0, 0, 7); ctx.fill(); // 噴射光
+        } else {
+            // 隕石團：全障礙
+            ctx.fillStyle = '#555';
+            [[-15,-20], [15,-25], [0,-50], [-20,-60], [18,-70]].forEach(pos => {
+                ctx.beginPath(); ctx.arc(pos[0], pos[1], 15, 0, 7); ctx.fill();
+                ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(pos[0]+5, pos[1]-5, 4, 0, 7); ctx.fill();
+                ctx.fillStyle = '#555';
+            });
+        }
+        ctx.restore();
+    }
+
+    function loop() {
+        if (gameState === 'OVER') {
+            ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0,0,450,600);
+            ctx.fillStyle = '#ff5555'; ctx.textAlign = 'center'; ctx.font = 'bold 42px Arial';
+            ctx.fillText('MISSION FAILED', 225, 260);
+            ctx.fillStyle = 'white'; ctx.font = '24px Arial';
+            ctx.fillText('FINAL SCORE: ' + Math.floor(score), 225, 310);
+            ctx.fillStyle = '#00f2ff'; ctx.font = '18px Arial';
+            ctx.fillText('按下 [空白鍵] 回整備室', 225, 380);
+            return;
+        }
+        if (isPaused) return;
+
+        ctx.clearRect(0, 0, 450, 600);
+        drawScene();
+        frame++; speed += 0.000008;
+        if (buff.timer > 0) { buff.timer--; if(buff.timer===0) updateHUD(); }
+
+        // 物理更新
+        if (player.jumping) {
+            player.y += player.v; player.v -= player.gravity;
+            if (player.y <= 0) { player.y = 0; player.jumping = false; player.v = 0; }
+        }
+        if (player.sliding > 0) player.sliding--;
+
+        // 障礙物碰撞與生成
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let o = obstacles[i]; o.z += speed;
+            drawObs(o, frame);
+
+            if (o.z > 0.82 && o.z < 0.94 && o.lane === player.lane) {
+                let hit = false;
+                if (o.type === 'GOBLIN' && player.y < 35) hit = true;
+                if (o.type === 'ASTRONAUT' && player.sliding <= 0) hit = true;
+                if (o.type === 'ROCK') hit = true;
+
+                if (hit) {
+                    if (buff.timer > 0 && (buff.type === 'shield' || buff.type === 'super')) {
+                        if (buff.type === 'shield') buff.timer = 0;
+                        obstacles.splice(i, 1); updateHUD();
+                    } else { gameState = 'OVER'; save(); }
+                }
+            }
+            if (o.z > 1.2) {
+                obstacles.splice(i, 1);
+                let pointInc = (buff.type === 'double' && buff.timer > 0) ? 20 : 10;
+                score += pointInc; 
+                gold += 5; // 每次過障礙物(10分)得5金幣
+                if (score > high) { high = Math.floor(score); }
+                save(); syncUI();
+            }
+        }
+
+        let spawnRate = Math.max(25, Math.floor(60 - score / 400));
+        if (frame % spawnRate === 0) {
+            let r = Math.random();
+            obstacles.push({ 
+                lane: Math.floor(Math.random() * 3), 
+                z: 0, 
+                type: r < 0.4 ? 'GOBLIN' : (r < 0.75 ? 'ASTRONAUT' : 'ROCK') 
+            });
+        }
+
+        document.getElementById('scoreText').innerText = Math.floor(score);
+        drawPlayer(frame);
+        requestAnimationFrame(loop);
+    }
+
+    syncUI();
+</script>
+</body>
+</html>
