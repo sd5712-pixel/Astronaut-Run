@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Astronaut, Run! - Cross Platform</title>
+    <title>Astronaut, Run! - Master Edition</title>
     <style>
-        /* 基礎樣式與防止手機縮放 */
         * { touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; overflow: hidden; background: #050510; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; }
         
-        /* 固定 3:4 比例容器 */
         #gameContainer { 
             position: relative; 
             width: 450px; 
@@ -21,12 +19,9 @@
             background: #000;
         }
 
-        /* 手機適應：如果螢幕太小則縮放容器 */
+        /* 手機 RWD 縮放 */
         @media (max-width: 500px), (max-height: 650px) {
             #gameContainer { transform: scale(0.85); }
-        }
-        @media (max-width: 400px) {
-            #gameContainer { transform: scale(0.75); }
         }
 
         canvas { display: block; width: 100%; height: 100%; }
@@ -34,78 +29,61 @@
         /* 介面層 */
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; z-index: 100; box-sizing: border-box; }
         .bg-dark { background: rgba(5, 5, 20, 0.95); }
-        .btn-neon { padding: 12px 40px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; color: #050510; box-shadow: 0 0 20px #00f2ff; margin-top: 20px; transition: 0.2s; }
-        .btn-neon:hover { transform: scale(1.05); background: #fff; }
+        .btn-neon { padding: 12px 40px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; color: #050510; box-shadow: 0 0 20px #00f2ff; margin-top: 20px; z-index: 110; }
         
         .manual { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 10px; font-size: 13px; text-align: left; line-height: 1.5; border: 1px solid #444; width: 85%; margin-top: 15px; }
-        
-        /* 商店與暫停 */
+
+        /* 整備室道具卡 */
+        .item-grid { display: flex; gap: 8px; margin-top: 15px; justify-content: center; }
+        .item-card { border: 2px solid #444; padding: 10px; border-radius: 10px; width: 85px; cursor: pointer; background: rgba(255,255,255,0.05); font-size: 11px; }
+        .item-card.selected { border-color: #00f2ff; background: rgba(0,242,255,0.2); }
+
+        /* 暫停商店 */
         #pauseOverlay { display: none; background: rgba(0,0,0,0.8); z-index: 200; flex-direction: row; }
         #sideShop { width: 160px; height: 100%; background: #0a0a1a; border-left: 2px solid #00f2ff; padding: 20px 10px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
         .shop-btn { background: #222; border: 1px solid #444; color: white; width: 100%; padding: 10px 5px; margin-bottom: 12px; cursor: pointer; font-size: 11px; border-radius: 5px; }
 
-        /* UI 元件 */
+        /* UI */
         #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; color: #00f2ff; z-index: 50; text-align: left; }
         #hud { position: absolute; bottom: 85px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; font-size: 12px; border-left: 4px solid #00f2ff; z-index: 50; }
 
-        /* 手機虛擬按鈕 */
-        .mobile-btns {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 15px;
-            z-index: 150;
-        }
-        .m-btn {
-            width: 55px;
-            height: 55px;
-            background: rgba(0, 242, 255, 0.2);
-            border: 2px solid #00f2ff;
-            border-radius: 50%;
-            color: #00f2ff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 20px;
-            cursor: pointer;
-            backdrop-filter: blur(5px);
-        }
-        .m-btn:active { background: #00f2ff; color: #000; }
+        /* 手機按鈕 */
+        .mobile-btns { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 15px; z-index: 150; }
+        .m-btn { width: 55px; height: 55px; background: rgba(0, 242, 255, 0.2); border: 2px solid #00f2ff; border-radius: 50%; color: #00f2ff; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 20px; backdrop-filter: blur(5px); }
     </style>
 </head>
 <body>
 
-<div id="gameContainer">
-    <div id="startScreen" class="overlay bg-dark">
+<div id="gameContainer" id="mainContainer">
+    <div id="startScreen" class="overlay bg-dark" onclick="toLobby()">
         <h1 style="color:#00f2ff; text-shadow:0 0 20px #00f2ff; font-size: 42px; margin: 0;">Astronaut, Run!</h1>
         <div class="manual">
             <b style="color:#ffcc00">電腦 / 手機操作：</b><br>
             • <b>A/D 或 左右滑</b> : 更換跑道<br>
-            • <b>W 或 向上滑</b> : 跳躍 (躲避矮怪)<br>
+            • <b>W 或 向上滑</b> : 跳躍 (躲避哥布林)<br>
             • <b>S 或 向下滑</b> : 下滑 (躲避太空人/快速落地)<br>
-            • <b>Z 鍵 或 [Z] 按鈕</b> : 暫停與商店<br>
-            • <b>Q 鍵 或 [Q] 按鈕</b> : 使用道具
+            • <b>點擊螢幕</b> : 進行選單確認<br>
+            • <b>Q/Z 按鈕</b> : 使用道具 / 暫停商店
         </div>
-        <button class="btn-neon" onclick="toLobby()">進入整備室</button>
+        <div style="margin-top:20px; color:#00f2ff; animation:blink 1s infinite;">[ 點擊螢幕 或 按空白鍵 進入整備室 ]</div>
     </div>
 
     <div id="lobbyScreen" class="overlay bg-dark" style="display:none;">
-        <h2 style="color:#00f2ff">整備室：選擇裝備</h2>
+        <h2 style="color:#00f2ff">整備室：點選裝備</h2>
         <div style="color:#ffcc00; margin-bottom:10px;">金幣餘額: $<span id="lobbyCoins">0</span></div>
-        <div id="itemGrid" style="display:flex; gap:8px; margin-bottom:15px;">
-            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('shield')">🛡️<br>防護罩</div>
-            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('double')">💎<br>炭吉</div>
-            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('super')">🔥<br>超級</div>
+        <div class="item-grid">
+            <div class="item-card" id="card-shield" onclick="event.stopPropagation(); selectItem('shield')">🛡️<br>防護罩</div>
+            <div class="item-card" id="card-double" onclick="event.stopPropagation(); selectItem('double')">💎<br>炭吉</div>
+            <div class="item-card" id="card-super" onclick="event.stopPropagation(); selectItem('super')">🔥<br>超級</div>
         </div>
-        <button class="btn-neon" onclick="startGame()">出發！</button>
+        <button class="btn-neon" onclick="event.stopPropagation(); startGame()">出發！</button>
+        <div style="margin-top:15px; font-size:12px; color:#666;">或按下 [空白鍵] 出發</div>
     </div>
 
     <div id="pauseOverlay" class="overlay">
-        <div style="flex:1;">
-            <h2 style="color:#00f2ff; font-size: 36px; margin-top:100px;">PAUSED</h2>
-            <button class="btn-neon" onclick="togglePause()">繼續遊戲</button>
+        <div style="flex:1;" onclick="togglePause()">
+            <h2 style="color:#00f2ff; font-size: 36px; margin-top:120px;">PAUSED</h2>
+            <p>點擊左側回到遊戲</p>
         </div>
         <div id="sideShop">
             <div style="font-size: 20px;">宇宙商店</div>
@@ -117,20 +95,20 @@
     </div>
 
     <div id="ui">
-        <div style="color:#ff5555; font-size:12px;">HI: <span id="hiText">0</span></div>
+        <div style="color:#ff5555; font-size:12px;">HI-SCORE: <span id="hiText">0</span></div>
         <div style="font-size:28px; font-weight:bold;">SCORE: <span id="scoreText">0</span></div>
-        <div style="color:#ffcc00;">$ <span id="coinText">0</span></div>
+        <div style="color:#ffcc00;">GOLD: $<span id="coinText">0</span></div>
     </div>
 
     <div id="hud">
         <div id="hud-item">裝備：無</div>
         <div id="hud-count">剩餘：0/3</div>
-        <div id="hud-timer" style="color:#00f2ff; height:15px;"></div>
+        <div id="hud-timer" style="color:#00f2ff; height:15px; font-weight:bold;"></div>
     </div>
 
     <div class="mobile-btns">
-        <div class="m-btn" onclick="handleInput('q')">Q</div>
-        <div class="m-btn" onclick="handleInput('z')">Z</div>
+        <div class="m-btn" id="btnQ">Q</div>
+        <div class="m-btn" id="btnZ">Z</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -149,17 +127,16 @@
     let currentItem = 'none', useCount = 0, buff = { type: '', timer: 0 };
     const player = { x: 225, lane: 1, jumping: false, v: 0, y: 0, sliding: 0, gravity: 1.2 };
 
-    // --- 核心輸入處理 (整合鍵盤與觸控) ---
-    function handleInput(cmd) {
-        if (gameState === 'START' && cmd === 'space') toLobby();
-        else if (gameState === 'LOBBY' && cmd === 'space') startGame();
-        else if (gameState === 'OVER' && cmd === 'space') toLobby();
+    // --- 核心輸入邏輯 ---
+    function handleAction(cmd) {
+        if (gameState === 'START') { toLobby(); return; }
+        if (gameState === 'LOBBY' && cmd === 'space') { startGame(); return; }
+        if (gameState === 'OVER') { toLobby(); return; }
 
         if (cmd === 'z') togglePause();
         if (cmd === 'q' && gameState === 'PLAYING' && !isPaused) useItem();
 
         if (gameState !== 'PLAYING' || isPaused) return;
-
         if (cmd === 'left' && player.lane > 0) player.lane--;
         if (cmd === 'right' && player.lane < 2) player.lane++;
         if (cmd === 'up') {
@@ -172,37 +149,56 @@
         }
     }
 
-    // 鍵盤監聽
+    // 鍵盤
     window.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
-        if (e.code === 'Space') handleInput('space');
-        if (k === 'w') handleInput('up');
-        if (k === 's') handleInput('down');
-        if (k === 'a') handleInput('left');
-        if (k === 'd') handleInput('right');
-        if (k === 'z') handleInput('z');
-        if (k === 'q') handleInput('q');
+        if (e.code === 'Space') handleAction('space');
+        else if (k === 'w') handleAction('up');
+        else if (k === 's') handleAction('down');
+        else if (k === 'a') handleAction('left');
+        else if (k === 'd') handleAction('right');
+        else if (k === 'z') handleAction('z');
+        else if (k === 'q') handleAction('q');
     });
 
-    // 觸控滑動監聽
-    let tX = 0, tY = 0;
+    // 手機滑動與點擊
+    let tX, tY;
     canvas.addEventListener('touchstart', e => {
         tX = e.touches[0].clientX;
         tY = e.touches[0].clientY;
+        if (gameState !== 'PLAYING') handleAction('click');
     });
     canvas.addEventListener('touchend', e => {
         let dX = e.changedTouches[0].clientX - tX;
         let dY = e.changedTouches[0].clientY - tY;
         if (Math.abs(dX) > Math.abs(dY)) {
-            if (dX > 30) handleInput('right');
-            else if (dX < -30) handleInput('left');
+            if (dX > 35) handleAction('right'); else if (dX < -35) handleAction('left');
         } else {
-            if (dY > 30) handleInput('down');
-            else if (dY < -30) handleInput('up');
+            if (dY > 35) handleAction('down'); else if (dY < -35) handleAction('up');
         }
     });
 
-    // --- 遊戲邏輯函數 ---
+    // 手機按鈕點擊
+    document.getElementById('btnQ').addEventListener('touchstart', e => { e.stopPropagation(); handleAction('q'); });
+    document.getElementById('btnZ').addEventListener('touchstart', e => { e.stopPropagation(); handleAction('z'); });
+
+    // --- 遊戲流程 ---
+    function toLobby() {
+        gameState = 'LOBBY';
+        document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('lobbyScreen').style.display = 'flex';
+        syncUI();
+    }
+
+    function startGame() {
+        gameState = 'PLAYING';
+        document.getElementById('lobbyScreen').style.display = 'none';
+        score = 0; speed = 0.018; isPaused = false; obstacles = []; player.lane = 1; frame = 0; useCount = 0; buff = { type: '', timer: 0 };
+        playerColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        updateHUD(); syncUI();
+        requestAnimationFrame(loop);
+    }
+
     function togglePause() {
         if(gameState !== 'PLAYING') return;
         isPaused = !isPaused;
@@ -218,6 +214,7 @@
         }
     }
 
+    function selectItem(t) { currentItem = t; updateHUD(); syncUI(); }
     function buy(t) {
         const p = { shield: 50, double: 100, super: 150 };
         if (gold >= p[t]) { gold -= p[t]; inv[t]++; save(); syncUI(); }
@@ -234,32 +231,15 @@
         document.getElementById('shopCoins').innerText = gold;
         document.getElementById('coinText').innerText = gold;
         document.getElementById('hiText').innerText = high;
+        document.querySelectorAll('.item-card').forEach(c => c.classList.toggle('selected', c.id === 'card-'+currentItem));
     }
 
-    function toLobby() {
-        gameState = 'LOBBY';
-        document.getElementById('startScreen').style.display = 'none';
-        document.getElementById('lobbyScreen').style.display = 'flex';
-        syncUI();
-    }
-
-    function selectItem(t) { currentItem = t; updateHUD(); }
-    
     function updateHUD() {
         document.getElementById('hud-item').innerText = "裝備：" + currentItem;
-        document.getElementById('hud-count').innerText = "剩餘：" + (3-useCount) + "/3";
+        document.getElementById('hud-count').innerText = "次數：" + (3-useCount) + "/3";
     }
 
-    function startGame() {
-        gameState = 'PLAYING';
-        document.getElementById('lobbyScreen').style.display = 'none';
-        score = 0; speed = 0.016; isPaused = false; obstacles = []; player.lane = 1; frame = 0; useCount = 0; buff = { type: '', timer: 0 };
-        playerColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
-        updateHUD(); syncUI();
-        requestAnimationFrame(loop);
-    }
-
-    // --- 繪圖邏輯 (物件相同) ---
+    // --- 繪圖邏輯 (精細物件) ---
     function drawScene() {
         let g = ctx.createLinearGradient(0, 0, 0, 600);
         g.addColorStop(0, '#050510'); g.addColorStop(1, '#000');
@@ -271,44 +251,68 @@
     }
 
     function drawPlayer(f) {
-        let targetX = [100, 225, 350][player.lane];
-        player.x += (targetX - player.x) * 0.3;
+        let tX = [100, 225, 350][player.lane];
+        player.x += (tX - player.x) * 0.3;
         ctx.save(); ctx.translate(player.x, 540 - player.y);
-        if (buff.timer > 0 && (buff.type === 'shield' || buff.type === 'super')) {
-            ctx.strokeStyle = '#00f2ff'; ctx.beginPath(); ctx.arc(0,-30,40,0,7); ctx.stroke();
+        if (buff.timer > 0) {
+            ctx.strokeStyle = buff.type === 'super' ? '#ffcc00' : '#00f2ff';
+            ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0,-30,45,0,7); ctx.stroke();
         }
         ctx.fillStyle = playerColor;
-        if (player.sliding > 0) ctx.fillRect(-25, -15, 50, 15);
-        else ctx.fillRect(-15, -50, 30, 50);
+        if (player.sliding > 0) {
+            ctx.beginPath(); ctx.ellipse(0, -10, 35, 12, 0, 0, 7); ctx.fill();
+        } else {
+            ctx.beginPath(); ctx.ellipse(0, -50, 18, 22, 0, 0, 7); ctx.fill(); // 頭
+            ctx.fillStyle = '#000'; ctx.fillRect(-8,-58,5,10); ctx.fillRect(3,-58,5,10); // 眼
+            ctx.fillStyle = playerColor; ctx.fillRect(-15,-30,30,25); // 身
+        }
         ctx.restore();
     }
 
     function drawObs(o, f) {
         let z = o.z;
-        let screenY = 240 + (z * 360);
+        let sY = 240 + (z * 360);
         let scale = 0.1 + z * 1.5;
-        let laneX = [85, 225, 365][o.lane];
-        let screenX = 225 + (laneX - 225) * scale;
-        ctx.save(); ctx.translate(screenX, screenY); ctx.scale(scale, scale);
-        if(o.type === 'GOBLIN') { ctx.fillStyle='#4a4'; ctx.fillRect(-15,-30,30,30); }
-        else if(o.type === 'ASTRONAUT') { ctx.fillStyle='#fff'; ctx.fillRect(-15,-80,30,30); }
-        else { ctx.fillStyle='#777'; ctx.beginPath(); ctx.arc(0,-20,20,0,7); ctx.fill(); }
+        let lX = [85, 225, 365][o.lane];
+        let sX = 225 + (lX - 225) * scale;
+        ctx.save(); ctx.translate(sX, sY); ctx.scale(scale, scale);
+        
+        if (o.type === 'GOBLIN') {
+            ctx.fillStyle = '#4a4'; ctx.fillRect(-15,-35,30,25); // 身
+            ctx.fillStyle = '#fff'; ctx.fillRect(-8,-30,5,5); ctx.fillRect(3,-30,5,5); // 眼
+            ctx.fillStyle = '#4a4'; ctx.fillRect(-22,-30,7,12); ctx.fillRect(15,-30,7,12); // 手
+        } else if (o.type === 'ASTRONAUT') {
+            ctx.translate(0, -50);
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -35, 18, 0, 7); ctx.fill(); // 頭
+            ctx.fillStyle = '#222'; ctx.beginPath(); ctx.ellipse(0,-35,12,8,0,0,7); ctx.fill(); // 面罩
+            ctx.fillStyle = '#00f2ff33'; ctx.beginPath(); ctx.ellipse(0,15,20,5,0,0,7); ctx.fill(); // 光圈
+        } else {
+            ctx.fillStyle = '#777';
+            for(let i=0; i<5; i++) { ctx.beginPath(); ctx.arc(Math.sin(i)*15, -20-i*5, 12, 0, 7); ctx.fill(); }
+        }
         ctx.restore();
     }
 
     function loop() {
         if (gameState === 'OVER') {
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,450,600);
-            ctx.fillStyle = '#ff5555'; ctx.textAlign = 'center'; ctx.font = '30px Arial';
-            ctx.fillText('MISSION FAILED', 225, 300);
+            ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0,0,450,600);
+            ctx.fillStyle = '#ff5555'; ctx.textAlign = 'center'; ctx.font = 'bold 36px Arial';
+            ctx.fillText('MISSION FAILED', 225, 260);
+            ctx.fillStyle = '#fff'; ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + Math.floor(score), 225, 310);
+            ctx.font = '16px Arial'; ctx.fillText('[ 點擊螢幕重新開始 ]', 225, 380);
             return;
         }
         if (isPaused) return;
 
         ctx.clearRect(0,0,450,600);
         drawScene();
-        frame++; speed += 0.00001;
-        if(buff.timer > 0) buff.timer--;
+        frame++; speed += 0.000008;
+        if(buff.timer > 0) {
+            buff.timer--; 
+            document.getElementById('hud-timer').innerText = "⚠️ 道具效期中";
+            if(buff.timer === 0) document.getElementById('hud-timer').innerText = "";
+        }
 
         if (player.jumping) {
             player.y += player.v; player.v -= player.gravity;
@@ -321,7 +325,7 @@
             drawObs(o, frame);
             if (o.z > 0.85 && o.z < 0.95 && o.lane === player.lane) {
                 let hit = false;
-                if (o.type === 'GOBLIN' && player.y < 30) hit = true;
+                if (o.type === 'GOBLIN' && player.y < 35) hit = true;
                 if (o.type === 'ASTRONAUT' && player.sliding <= 0) hit = true;
                 if (o.type === 'ROCK') hit = true;
                 if (hit) {
@@ -334,14 +338,14 @@
             if (o.z > 1.1) {
                 obstacles.splice(i, 1);
                 score += (buff.type === 'double' && buff.timer > 0) ? 20 : 10;
-                gold += 5; if(score > high) high = score;
+                gold += 5; if(score > high) high = Math.floor(score);
                 save(); syncUI();
             }
         }
 
-        if (frame % 60 === 0) {
+        if (frame % Math.max(25, Math.floor(60 - score/500)) === 0) {
             let r = Math.random();
-            obstacles.push({ lane: Math.floor(Math.random() * 3), z: 0, type: r < 0.4 ? 'GOBLIN' : (r < 0.7 ? 'ASTRONAUT' : 'ROCK') });
+            obstacles.push({ lane: Math.floor(Math.random() * 3), z: 0, type: r < 0.35 ? 'GOBLIN' : (r < 0.7 ? 'ASTRONAUT' : 'ROCK') });
         }
 
         document.getElementById('scoreText').innerText = Math.floor(score);
