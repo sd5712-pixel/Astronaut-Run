@@ -3,105 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Astronaut, Run! - Mobile Edition</title>
+    <title>Astronaut, Run! - Cross Platform</title>
     <style>
-        /* 防止手機版捲動與縮放 */
-        * { touch-action: none; -webkit-tap-highlight-color: transparent; }
+        /* 基礎樣式與防止手機縮放 */
+        * { touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; overflow: hidden; background: #050510; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; }
         
+        /* 固定 3:4 比例容器 */
         #gameContainer { 
             position: relative; 
-            width: 100vw; 
-            height: 100vh; 
-            max-width: 450px; 
-            max-height: 800px; 
-            border: 2px solid #333; 
-            background: #000; 
-            overflow: hidden;
+            width: 450px; 
+            height: 600px; 
+            border: 4px solid #333; 
+            border-radius: 15px; 
+            box-shadow: 0 0 50px rgba(0,242,255,0.4); 
+            overflow: hidden; 
+            background: #000;
         }
+
+        /* 手機適應：如果螢幕太小則縮放容器 */
+        @media (max-width: 500px), (max-height: 650px) {
+            #gameContainer { transform: scale(0.85); }
+        }
+        @media (max-width: 400px) {
+            #gameContainer { transform: scale(0.75); }
+        }
+
         canvas { display: block; width: 100%; height: 100%; }
         
-        /* 介面層調整 */
-        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; z-index: 100; box-sizing: border-box; padding: 20px; }
+        /* 介面層 */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; z-index: 100; box-sizing: border-box; }
         .bg-dark { background: rgba(5, 5, 20, 0.95); }
-        .btn-neon { padding: 15px 40px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 20px; color: #050510; box-shadow: 0 0 20px #00f2ff; margin-top: 20px; }
+        .btn-neon { padding: 12px 40px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; color: #050510; box-shadow: 0 0 20px #00f2ff; margin-top: 20px; transition: 0.2s; }
+        .btn-neon:hover { transform: scale(1.05); background: #fff; }
         
-        .manual { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 10px; font-size: 13px; text-align: left; line-height: 1.6; border: 1px solid #444; width: 90%; margin-top: 15px; }
-        .key-hint { font-size: 14px; color: #00f2ff; margin-top: 15px; font-weight: bold; animation: blink 1s infinite; }
-
-        .item-grid { display: flex; gap: 8px; margin-top: 15px; justify-content: center; flex-wrap: wrap; }
-        .item-card { border: 2px solid #444; padding: 10px; border-radius: 10px; width: 85px; cursor: pointer; background: rgba(255,255,255,0.05); font-size: 11px; }
-        .item-card.selected { border-color: #00f2ff; background: rgba(0,242,255,0.2); }
-
+        .manual { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 10px; font-size: 13px; text-align: left; line-height: 1.5; border: 1px solid #444; width: 85%; margin-top: 15px; }
+        
         /* 商店與暫停 */
-        #pauseOverlay { display: none; background: rgba(0,0,0,0.85); z-index: 200; flex-direction: column; }
-        #sideShop { width: 100%; background: #0a0a1a; border-top: 2px solid #00f2ff; padding: 15px; box-sizing: border-box; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-        .shop-btn { background: #222; border: 1px solid #444; color: white; padding: 10px; flex: 1; min-width: 100px; font-size: 11px; border-radius: 5px; }
+        #pauseOverlay { display: none; background: rgba(0,0,0,0.8); z-index: 200; flex-direction: row; }
+        #sideShop { width: 160px; height: 100%; background: #0a0a1a; border-left: 2px solid #00f2ff; padding: 20px 10px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+        .shop-btn { background: #222; border: 1px solid #444; color: white; width: 100%; padding: 10px 5px; margin-bottom: 12px; cursor: pointer; font-size: 11px; border-radius: 5px; }
 
-        #ui { position: absolute; top: 15px; left: 15px; pointer-events: none; color: #00f2ff; z-index: 50; }
-        #hud { position: absolute; bottom: 80px; right: 15px; color: white; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; font-size: 12px; border-right: 4px solid #00f2ff; }
-        
-        /* 手機版專用按鈕 (Q 與 Z) */
-        .mobile-controls { position: absolute; bottom: 20px; left: 0; width: 100%; display: flex; justify-content: space-around; z-index: 60; }
-        .m-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.1); border: 2px solid #00f2ff; border-radius: 50%; color: #00f2ff; display: flex; justify-content: center; align-items: center; font-weight: bold; }
+        /* UI 元件 */
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; color: #00f2ff; z-index: 50; text-align: left; }
+        #hud { position: absolute; bottom: 85px; left: 20px; color: white; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; font-size: 12px; border-left: 4px solid #00f2ff; z-index: 50; }
+
+        /* 手機虛擬按鈕 */
+        .mobile-btns {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 150;
+        }
+        .m-btn {
+            width: 55px;
+            height: 55px;
+            background: rgba(0, 242, 255, 0.2);
+            border: 2px solid #00f2ff;
+            border-radius: 50%;
+            color: #00f2ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+        .m-btn:active { background: #00f2ff; color: #000; }
     </style>
 </head>
 <body>
 
 <div id="gameContainer">
     <div id="startScreen" class="overlay bg-dark">
-        <h1 style="color:#00f2ff; text-shadow:0 0 20px #00f2ff; font-size: 36px; margin: 0;">Astronaut, Run!</h1>
+        <h1 style="color:#00f2ff; text-shadow:0 0 20px #00f2ff; font-size: 42px; margin: 0;">Astronaut, Run!</h1>
         <div class="manual">
-            <b style="color:#ffcc00">手機操作：</b><br>
-            • <b>左右滑動</b> : 切換跑道<br>
-            • <b>向上滑動</b> : 跳躍 (躲避哥布林)<br>
-            • <b>向下滑動</b> : 下滑 (躲避太空人)<br>
-            • <b>點擊 [Z]</b> : 暫停 / 商店<br>
-            • <b>點擊 [Q]</b> : 使用道具
+            <b style="color:#ffcc00">電腦 / 手機操作：</b><br>
+            • <b>A/D 或 左右滑</b> : 更換跑道<br>
+            • <b>W 或 向上滑</b> : 跳躍 (躲避矮怪)<br>
+            • <b>S 或 向下滑</b> : 下滑 (躲避太空人/快速落地)<br>
+            • <b>Z 鍵 或 [Z] 按鈕</b> : 暫停與商店<br>
+            • <b>Q 鍵 或 [Q] 按鈕</b> : 使用道具
         </div>
-        <button class="btn-neon" onclick="toLobby()">開始整備</button>
-        <div class="key-hint">點擊螢幕繼續</div>
+        <button class="btn-neon" onclick="toLobby()">進入整備室</button>
     </div>
 
     <div id="lobbyScreen" class="overlay bg-dark" style="display:none;">
-        <h2 style="color:#00f2ff">整備室</h2>
-        <div style="color:#ffcc00; margin-bottom:10px;">金幣: $<span id="lobbyCoins">0</span></div>
-        <div class="item-grid">
-            <div class="item-card" id="card-shield" onclick="selectItem('shield')">🛡️<br>防護(5s)<br>(<span id="inv-shield">0</span>)</div>
-            <div class="item-card" id="card-double" onclick="selectItem('double')">💎<br>雙倍(30s)<br>(<span id="inv-double">0</span>)</div>
-            <div class="item-card" id="card-super" onclick="selectItem('super')">🔥<br>超級(20s)<br>(<span id="inv-super">0</span>)</div>
+        <h2 style="color:#00f2ff">整備室：選擇裝備</h2>
+        <div style="color:#ffcc00; margin-bottom:10px;">金幣餘額: $<span id="lobbyCoins">0</span></div>
+        <div id="itemGrid" style="display:flex; gap:8px; margin-bottom:15px;">
+            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('shield')">🛡️<br>防護罩</div>
+            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('double')">💎<br>炭吉</div>
+            <div style="border:1px solid #444; padding:8px;" onclick="selectItem('super')">🔥<br>超級</div>
         </div>
         <button class="btn-neon" onclick="startGame()">出發！</button>
     </div>
 
     <div id="pauseOverlay" class="overlay">
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-            <h2 style="color:#00f2ff; font-size: 32px;">已暫停</h2>
-            <button class="btn-neon" onclick="togglePause()" style="font-size:16px;">繼續遊戲</button>
+        <div style="flex:1;">
+            <h2 style="color:#00f2ff; font-size: 36px; margin-top:100px;">PAUSED</h2>
+            <button class="btn-neon" onclick="togglePause()">繼續遊戲</button>
         </div>
         <div id="sideShop">
-            <div style="width:100%; color:#ffcc00; margin-bottom:10px;">商店 💰 $<span id="shopCoins">0</span></div>
-            <button class="shop-btn" onclick="buy('shield')">🛡️ $50</button>
-            <button class="shop-btn" onclick="buy('double')">💎 $100</button>
-            <button class="shop-btn" onclick="buy('super')">🔥 $150</button>
+            <div style="font-size: 20px;">宇宙商店</div>
+            <div style="color:#ffcc00; margin: 10px 0;">💰 $<span id="shopCoins">0</span></div>
+            <button class="shop-btn" onclick="buy('shield')">🛡️ 防護罩 $50</button>
+            <button class="shop-btn" onclick="buy('double')">💎 炭吉 $100</button>
+            <button class="shop-btn" onclick="buy('super')">🔥 超級 $150</button>
         </div>
     </div>
 
     <div id="ui">
-        <div style="font-size:12px;">HI: <span id="hiText">0</span></div>
-        <div style="font-size:24px; font-weight:bold;">SCORE: <span id="scoreText">0</span></div>
+        <div style="color:#ff5555; font-size:12px;">HI: <span id="hiText">0</span></div>
+        <div style="font-size:28px; font-weight:bold;">SCORE: <span id="scoreText">0</span></div>
         <div style="color:#ffcc00;">$ <span id="coinText">0</span></div>
     </div>
 
     <div id="hud">
-        <div id="hud-item">無</div>
-        <div id="hud-count">0/3</div>
-        <div id="hud-timer" style="color:#00f2ff; font-size:10px;"></div>
+        <div id="hud-item">裝備：無</div>
+        <div id="hud-count">剩餘：0/3</div>
+        <div id="hud-timer" style="color:#00f2ff; height:15px;"></div>
     </div>
 
-    <div class="mobile-controls" id="mobileUI" style="display:none;">
-        <div class="m-btn" onclick="useItem()">Q</div>
-        <div class="m-btn" onclick="togglePause()">Z</div>
+    <div class="mobile-btns">
+        <div class="m-btn" onclick="handleInput('q')">Q</div>
+        <div class="m-btn" onclick="handleInput('z')">Z</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -110,65 +139,90 @@
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
-    // 設定畫布解析度
-    function resize() {
-        const container = document.getElementById('gameContainer');
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    canvas.width = 450; canvas.height = 600;
 
-    // 遊戲變數
+    // 數據管理
     let gold = parseInt(localStorage.getItem('astro_gold')) || 0;
     let high = parseInt(localStorage.getItem('astro_high')) || 0;
     let inv = JSON.parse(localStorage.getItem('astro_inv')) || { shield: 0, double: 0, super: 0 };
     let score, speed, isPaused, obstacles, frame, playerColor, gameState = 'START';
     let currentItem = 'none', useCount = 0, buff = { type: '', timer: 0 };
-    
     const player = { x: 225, lane: 1, jumping: false, v: 0, y: 0, sliding: 0, gravity: 1.2 };
 
-    // --- 觸控邏輯 (Touch Logic) ---
-    let touchStartX = 0;
-    let touchStartY = 0;
+    // --- 核心輸入處理 (整合鍵盤與觸控) ---
+    function handleInput(cmd) {
+        if (gameState === 'START' && cmd === 'space') toLobby();
+        else if (gameState === 'LOBBY' && cmd === 'space') startGame();
+        else if (gameState === 'OVER' && cmd === 'space') toLobby();
 
-    canvas.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-        touchStartY = e.changedTouches[0].screenY;
-        if(gameState === 'OVER') toLobby();
-    }, false);
+        if (cmd === 'z') togglePause();
+        if (cmd === 'q' && gameState === 'PLAYING' && !isPaused) useItem();
 
-    canvas.addEventListener('touchend', e => {
-        let touchEndX = e.changedTouches[0].screenX;
-        let touchEndY = e.changedTouches[0].screenY;
-        handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
-    }, false);
-
-    function handleSwipe(x1, y1, x2, y2) {
         if (gameState !== 'PLAYING' || isPaused) return;
 
-        let dx = x2 - x1;
-        let dy = y2 - y1;
-        const threshold = 30; // 滑動門檻值
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-            // 左右滑動
-            if (dx > threshold && player.lane < 2) player.lane++;
-            else if (dx < -threshold && player.lane > 0) player.lane--;
-        } else {
-            // 上下滑動
-            if (dy < -threshold) { // 向上
-                if (player.sliding > 0) player.sliding = 0;
-                if (!player.jumping) { player.v = 18; player.jumping = true; }
-            } else if (dy > threshold) { // 向下
-                if (player.jumping) player.v = -20;
-                else player.sliding = 20;
-            }
+        if (cmd === 'left' && player.lane > 0) player.lane--;
+        if (cmd === 'right' && player.lane < 2) player.lane++;
+        if (cmd === 'up') {
+            if (player.sliding > 0) player.sliding = 0;
+            if (!player.jumping) { player.v = 18; player.jumping = true; }
+        }
+        if (cmd === 'down') {
+            if (player.jumping) player.v = -20;
+            else player.sliding = 20;
         }
     }
 
-    // --- 遊戲邏輯 ---
+    // 鍵盤監聽
+    window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        if (e.code === 'Space') handleInput('space');
+        if (k === 'w') handleInput('up');
+        if (k === 's') handleInput('down');
+        if (k === 'a') handleInput('left');
+        if (k === 'd') handleInput('right');
+        if (k === 'z') handleInput('z');
+        if (k === 'q') handleInput('q');
+    });
+
+    // 觸控滑動監聽
+    let tX = 0, tY = 0;
+    canvas.addEventListener('touchstart', e => {
+        tX = e.touches[0].clientX;
+        tY = e.touches[0].clientY;
+    });
+    canvas.addEventListener('touchend', e => {
+        let dX = e.changedTouches[0].clientX - tX;
+        let dY = e.changedTouches[0].clientY - tY;
+        if (Math.abs(dX) > Math.abs(dY)) {
+            if (dX > 30) handleInput('right');
+            else if (dX < -30) handleInput('left');
+        } else {
+            if (dY > 30) handleInput('down');
+            else if (dY < -30) handleInput('up');
+        }
+    });
+
+    // --- 遊戲邏輯函數 ---
+    function togglePause() {
+        if(gameState !== 'PLAYING') return;
+        isPaused = !isPaused;
+        document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
+        if(!isPaused) loop();
+    }
+
+    function useItem() {
+        if(currentItem !== 'none' && useCount < 3 && inv[currentItem] > 0) {
+            inv[currentItem]--; useCount++; buff.type = currentItem;
+            buff.timer = currentItem === 'shield' ? 300 : (currentItem === 'double' ? 1800 : 1200);
+            save(); syncUI(); updateHUD();
+        }
+    }
+
+    function buy(t) {
+        const p = { shield: 50, double: 100, super: 150 };
+        if (gold >= p[t]) { gold -= p[t]; inv[t]++; save(); syncUI(); }
+    }
+
     function save() {
         localStorage.setItem('astro_gold', gold);
         localStorage.setItem('astro_high', high);
@@ -180,119 +234,81 @@
         document.getElementById('shopCoins').innerText = gold;
         document.getElementById('coinText').innerText = gold;
         document.getElementById('hiText').innerText = high;
-        document.getElementById('inv-shield').innerText = inv.shield;
-        document.getElementById('inv-double').innerText = inv.double;
-        document.getElementById('inv-super').innerText = inv.super;
-        document.querySelectorAll('.item-card').forEach(c => c.classList.toggle('selected', c.id === 'card-'+currentItem));
     }
 
     function toLobby() {
         gameState = 'LOBBY';
         document.getElementById('startScreen').style.display = 'none';
         document.getElementById('lobbyScreen').style.display = 'flex';
-        document.getElementById('mobileUI').style.display = 'none';
         syncUI();
+    }
+
+    function selectItem(t) { currentItem = t; updateHUD(); }
+    
+    function updateHUD() {
+        document.getElementById('hud-item').innerText = "裝備：" + currentItem;
+        document.getElementById('hud-count').innerText = "剩餘：" + (3-useCount) + "/3";
     }
 
     function startGame() {
         gameState = 'PLAYING';
         document.getElementById('lobbyScreen').style.display = 'none';
-        document.getElementById('mobileUI').style.display = 'flex';
         score = 0; speed = 0.016; isPaused = false; obstacles = []; player.lane = 1; frame = 0; useCount = 0; buff = { type: '', timer: 0 };
         playerColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
         updateHUD(); syncUI();
         requestAnimationFrame(loop);
     }
 
-    function selectItem(t) { currentItem = t; syncUI(); }
-
-    function useItem() {
-        if (gameState === 'PLAYING' && !isPaused && currentItem !== 'none' && useCount < 3 && inv[currentItem] > 0) {
-            inv[currentItem]--; useCount++; buff.type = currentItem;
-            buff.timer = currentItem === 'shield' ? 300 : (currentItem === 'double' ? 1800 : 1200);
-            save(); syncUI(); updateHUD();
-        }
-    }
-
-    function togglePause() {
-        if (gameState !== 'PLAYING') return;
-        isPaused = !isPaused;
-        document.getElementById('pauseOverlay').style.display = isPaused ? 'flex' : 'none';
-        if (!isPaused) loop();
-    }
-
-    function buy(t) {
-        const p = { shield: 50, double: 100, super: 150 };
-        if (gold >= p[t]) { gold -= p[t]; inv[t]++; save(); syncUI(); }
-    }
-
-    function updateHUD() {
-        document.getElementById('hud-item').innerText = currentItem === 'none' ? '無' : currentItem;
-        document.getElementById('hud-count').innerText = `${3 - useCount}/3`;
-        document.getElementById('hud-timer').innerText = buff.timer > 0 ? "EFFECTIVE" : "";
-    }
-
-    // --- 渲染 (與之前版本相同，但座標適應畫布寬度) ---
+    // --- 繪圖邏輯 (物件相同) ---
     function drawScene() {
-        ctx.fillStyle = '#050510'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        let g = ctx.createLinearGradient(0, 0, 0, 600);
+        g.addColorStop(0, '#050510'); g.addColorStop(1, '#000');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 450, 600);
         ctx.strokeStyle = '#00f2ff22';
-        let horizonY = canvas.height * 0.4;
-        for(let i=0; i<4; i++) {
-            let x = (canvas.width/4) * (i+0.5);
-            ctx.beginPath(); ctx.moveTo(canvas.width/2, horizonY); ctx.lineTo(x * 2 - canvas.width/2, canvas.height); ctx.stroke();
-        }
+        [-300, -100, 100, 300].forEach(w => {
+            ctx.beginPath(); ctx.moveTo(225 + w/15, 240); ctx.lineTo(225 + w, 600); ctx.stroke();
+        });
     }
 
     function drawPlayer(f) {
-        let laneWidth = canvas.width / 3;
-        let targetX = (player.lane + 0.5) * laneWidth;
+        let targetX = [100, 225, 350][player.lane];
         player.x += (targetX - player.x) * 0.3;
-        
-        ctx.save(); ctx.translate(player.x, canvas.height * 0.9 - player.y);
+        ctx.save(); ctx.translate(player.x, 540 - player.y);
         if (buff.timer > 0 && (buff.type === 'shield' || buff.type === 'super')) {
-            ctx.strokeStyle = buff.type === 'super' ? '#ffcc00' : '#00f2ff';
-            ctx.beginPath(); ctx.arc(0,-30, 40, 0, 7); ctx.stroke();
+            ctx.strokeStyle = '#00f2ff'; ctx.beginPath(); ctx.arc(0,-30,40,0,7); ctx.stroke();
         }
         ctx.fillStyle = playerColor;
         if (player.sliding > 0) ctx.fillRect(-25, -15, 50, 15);
-        else {
-            ctx.fillRect(-15, -50, 30, 40);
-            ctx.fillStyle = '#000'; ctx.fillRect(-8,-45,5,5); ctx.fillRect(3,-45,5,5);
-        }
+        else ctx.fillRect(-15, -50, 30, 50);
         ctx.restore();
     }
 
     function drawObs(o, f) {
-        let horizonY = canvas.height * 0.4;
         let z = o.z;
-        let screenY = horizonY + (z * (canvas.height - horizonY));
+        let screenY = 240 + (z * 360);
         let scale = 0.1 + z * 1.5;
-        let laneWidth = canvas.width / 3;
-        let laneX = (o.lane + 0.5) * laneWidth;
-        let screenX = canvas.width/2 + (laneX - canvas.width/2) * scale;
-
+        let laneX = [85, 225, 365][o.lane];
+        let screenX = 225 + (laneX - 225) * scale;
         ctx.save(); ctx.translate(screenX, screenY); ctx.scale(scale, scale);
         if(o.type === 'GOBLIN') { ctx.fillStyle='#4a4'; ctx.fillRect(-15,-30,30,30); }
-        else if(o.type === 'ASTRONAUT') { ctx.fillStyle='#fff'; ctx.fillRect(-15,-70,30,30); }
+        else if(o.type === 'ASTRONAUT') { ctx.fillStyle='#fff'; ctx.fillRect(-15,-80,30,30); }
         else { ctx.fillStyle='#777'; ctx.beginPath(); ctx.arc(0,-20,20,0,7); ctx.fill(); }
         ctx.restore();
     }
 
     function loop() {
         if (gameState === 'OVER') {
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,450,600);
             ctx.fillStyle = '#ff5555'; ctx.textAlign = 'center'; ctx.font = '30px Arial';
-            ctx.fillText('MISSION FAILED', canvas.width/2, canvas.height/2);
-            ctx.font = '16px Arial'; ctx.fillStyle = '#fff';
-            ctx.fillText('點擊螢幕重新開始', canvas.width/2, canvas.height/2 + 50);
+            ctx.fillText('MISSION FAILED', 225, 300);
             return;
         }
         if (isPaused) return;
 
-        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.clearRect(0,0,450,600);
         drawScene();
         frame++; speed += 0.00001;
-        if (buff.timer > 0) buff.timer--;
+        if(buff.timer > 0) buff.timer--;
 
         if (player.jumping) {
             player.y += player.v; player.v -= player.gravity;
@@ -308,7 +324,6 @@
                 if (o.type === 'GOBLIN' && player.y < 30) hit = true;
                 if (o.type === 'ASTRONAUT' && player.sliding <= 0) hit = true;
                 if (o.type === 'ROCK') hit = true;
-
                 if (hit) {
                     if (buff.timer > 0 && (buff.type === 'shield' || buff.type === 'super')) {
                         if (buff.type === 'shield') buff.timer = 0;
@@ -318,10 +333,9 @@
             }
             if (o.z > 1.1) {
                 obstacles.splice(i, 1);
-                let inc = (buff.type === 'double' && buff.timer > 0) ? 20 : 10;
-                score += inc; gold += 5;
-                if (score > high) high = score;
-                syncUI();
+                score += (buff.type === 'double' && buff.timer > 0) ? 20 : 10;
+                gold += 5; if(score > high) high = score;
+                save(); syncUI();
             }
         }
 
@@ -334,18 +348,6 @@
         drawPlayer(frame);
         requestAnimationFrame(loop);
     }
-
-    // 初始化鍵盤支援 (保留電腦遊玩)
-    window.addEventListener('keydown', e => {
-        if(e.code === 'Space') {
-            if(gameState==='START') toLobby();
-            else if(gameState==='LOBBY') startGame();
-            else if(gameState==='OVER') toLobby();
-        }
-        if(e.key.toLowerCase()==='q') useItem();
-        if(e.key.toLowerCase()==='z') togglePause();
-    });
-
     syncUI();
 </script>
 </body>
